@@ -1,0 +1,176 @@
+---
+title: "Trabajo Práctico N°2"
+author: Esmeralda Provitina
+output: html_notebook
+---
+
+### Introducción
+El objetivo del presente trabajo es poder integrar todos los conceptos vistos durante el
+curso, pero principalmente los del módulo #2.
+
+### Sobre mí
+¡Hola! Soy Esmeralda, una estudiante que se está adentrando en el mundo de la ciencia de datos.
+Este es mi trabajo para el curso de R de la UTN. Elegí trabajar con el dataset "smoking prediction" porque me pareció interesante explorar cómo el -mal- hábito de fumar impacta en las distintas variables del cuerpo y en la salud bucal. Además, fue recomendado por mi docente como buena base para los principiantes.
+
+# Cargamos las librerías necesarias
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+# Data Wrangling
+
+Antes de comenzar con el análisis, es fundamental realizar la limpieza íntegra de los datos. Tal como vimos en clase, importaremos el Dataset y lo "limpiaremos". 
+
+```{r}
+DF <- read.csv("7_smoking_prediction.csv", header = TRUE, sep = ",", stringsAsFactors = TRUE)
+
+###Ver nombres de variables
+names(DF)
+###Eliminación de casos incompletos (Missing values)
+DF <- DF[complete.cases(DF),]
+### Verificación de datos faltantes
+anyNA(DF)
+### Identificación de valores faltantes
+is.na(DF)
+### Verificación de valores numéricos inválidos
+sapply (DF, is.infinite)
+sapply(DF, is.nan)
+###Eliminación de variable irrelevante
+DF$ID <- NULL
+```
+
+# Análisis exploratorio 
+Se realiza un análisis exploratorio con el objetivo de comprender la estructura del DS, identificar los tipos de variables y analizar su distribución. 
+
+```{r}
+# Estructura del dataset
+str(DF)
+#Resumen general de las variables
+summary(DF)
+#Separación de las variables en numéricas y cuali para analizarlas de manera más específica
+class(DF)
+numericas <- DF[sapply(DF,is.numeric)]
+summary(numericas)
+cualitativas <- DF[!sapply(DF,is.numeric)]
+#Distribución de variables categóricas
+summary(cualitativas)
+#Medidas de tendencia central, dispersión y relaciones entre variables
+sapply(numericas, IQR)
+sapply(numericas, range)
+sapply(numericas, quantile)
+cor(numericas)
+sapply(numericas, mean)
+sapply(numericas,median)
+```
+
+# Planteo de preguntas: a partir del dataset, formulé los siguientes interrogantes para guiar el análisis:
+1) ¿Cuál es el porcentaje de fumadores y no fumadores?
+2) ¿La proporción de fumadores cambia según el género? ¿Cómo se distribuye?
+3) ¿Cuál es la edad promedio de los fumadores en comparación de los que no fuman?
+4) ¿Cuál es el nivel promedio de glucosa (azúcar en sangre en ayunas) en fumadores y en los no fumadores?
+5) ¿Existe relación entre la edad y el IMC aquí?
+6) ¿Hay diferencia entre en la presión arterial entre fumadores y no fumadores?
+7) ¿Existen diferencias en los niveles de grasas en sangre entre los que fuman y los que no?
+8) ¿Los fumadores tienen los niveles de hemoglobina más altos?
+9) ¿Los fumadores tienen peor salud bucal, teniendo en cuenta los indicadores de sarro y caries?
+10) ¿Hay diferencias en la distribución del IMC entre fumadores y no fumadores?
+
+# Respuestas a los interrogantes
+Para responder a las preguntas planteadas, se construyen tablas de contingencia y visualizaciones que permiten analizar la distribución de fumadores y no fumadores según distintas variables.
+
+```{r}
+# Conversión a factores para mejor interpretación
+DF$smoking_f <- factor(DF$smoking, levels = c(0, 1), labels = c("No fumador", "Fumador"))
+DF$gender_f <- factor(DF$gender)
+
+#Tabla de contingencia
+
+tabla_fuma_gen <- table(DF$gender_f, DF$smoking_f)
+tabla_fuma_gen
+
+(round(prop.table(tabla_fuma_gen, margin = 1) * 100, 2))
+
+# Resumen usando dplyr y pipes
+resumen_fum <- DF %>%
+  group_by(gender_f, smoking_f) %>%
+  summarise(cantidad = n (), .groups = 'drop') %>%
+  group_by(gender_f) %>%
+  mutate(porcentaje = cantidad / sum(cantidad) * 100)
+
+resumen_fum
+```
+
+```{r}
+# Gráfico n°1: proporción de fumadores según género
+
+gr1 <- ggplot(resumen_fum, aes(x = gender_f, y = cantidad, fill = smoking_f)) +
+  geom_bar(stat = "identity", position = "fill") +
+  geom_text(aes(label = paste0(round(porcentaje, 1), "%")),
+            position = position_fill(vjust = 0.5), 
+            color = "white") +
+            labs(title = "1. Proporción de fumadores según género",
+                 subtitle = "Distribución porcentual por género",
+                 x = "Género", y = "Proporción", fill = "Estado") +
+              theme_minimal()
+```
+Resultados: se observa una diferencia marcada en la proporción según el género: el hábito de fumar está significativamente más presente en los hombres (55,4) que en las mujeres aquí (95,8).
+
+```{r}
+# Gráfico n°2: Distribución por grupos
+
+gr2 <- ggplot(DF, aes(x = gender_f, fill = smoking_f)) +
+  geom_bar(position = "dodge") +
+  coord_flip() +
+  labs(title = "2. Distribución agrupada de fumadores por género horizontal",
+       x = "Género", y = "Cantidad absoluta", fill = "Estado") + 
+  theme_bw()
+```
+Resultados: se observa que la cantidad de hombres es significativamente mayor que la de mujeres fumadoras. Las mujeres presentan, contrariamente, una mayor cantidad de no fumadoras, reforzando el gráfico anterior.
+
+```{r}
+# Gráfico n° 3: Distribución por facetas
+
+gr3 <- ggplot(DF, aes(x = smoking_f, fill = gender_f)) +
+  geom_bar() +
+  facet_wrap(~ gender_f) +
+  labs (title = "3. Distribución separada por facetas",
+        x= "Estado", y = "Cantidad absoluta") +
+  theme_light() +
+  theme(legend.position = "none")
+
+```
+Resultado: en las mujeres predominan las no fumadoras. 
+
+
+```{r}
+# Gráfico n° 4: Frecuencia de combinaciones
+
+gr4 <- ggplot(DF, aes(x = gender_f, y = smoking_f)) +
+  geom_count(color = "steelblue") +
+  labs(title = "4. Frecuencia de combinaciones",
+       x = "Género", y = "Estado", size = "N° de casos") +
+  theme_classic()
+```
+Resultado: la burbuja más grande está en los hombres fumadores comparativamente con las mujeres.
+
+```{r}
+# Gráfico n° 5: Comparando porcentajes
+
+gr5 <- ggplot(resumen_fum, aes(x = smoking_f, y = porcentaje, fill = gender_f)) +
+                            geom_bar(stat = "identity", position = "dodge")+ 
+                                 labs(title = "5. Comparativa de porcentajes",
+                                      x ="Estado", y = "Porcentaje (%)", fill = "Género") +
+                                 theme_minimal()
+
+```
+Resultado: el hábito de fumar está fuertemente asociado al género en este dataset.
+
+```{r}
+gr1
+gr2
+gr3
+gr4
+gr5
+```
